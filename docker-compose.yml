@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: fleetguard-db
+    environment:
+      POSTGRES_USER: fleetguard_user
+      POSTGRES_PASSWORD: fleetguard_pass
+      POSTGRES_DB: fleetguard
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fleetguard_user -d fleetguard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fleetguard-app
+    ports:
+      - "8501:8501"
+    environment:
+      DATABASE_URL: postgresql://fleetguard_user:fleetguard_pass@db:5432/fleetguard
+      MLFLOW_TRACKING_URI: file:///app/mlruns
+      STREAMLIT_SERVER_PORT: "8501"
+      STREAMLIT_SERVER_ADDRESS: "0.0.0.0"
+      STREAMLIT_SERVER_HEADLESS: "true"
+      SIMULATION_SPEED: "1.0"
+      DEMO_MODE: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./mlruns:/app/mlruns
+      - ./logs:/app/logs
+
+volumes:
+  postgres_data:
