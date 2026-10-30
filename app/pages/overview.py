@@ -395,7 +395,7 @@ def _render_maintenance_workload(session: Session):
             text=df["wo_count"],
             textposition="outside",
             hovertemplate="<b>%{x}</b><br>Work Orders: %{y}<extra></extra>",
-        )]
+        )])
 
         fig.update_layout(
             margin=dict(t=10, b=10, l=10, r=10),
