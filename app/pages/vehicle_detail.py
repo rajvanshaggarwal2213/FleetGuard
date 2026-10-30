@@ -427,7 +427,7 @@ def _render_maintenance_tab(vehicle: Vehicle, session: Session):
                 WorkOrderStatus.OPEN: "status-open",
                 WorkOrderStatus.ASSIGNED: "status-assigned",
                 WorkOrderStatus.IN_PROGRESS: "status-in-progress",
-                WorkOrderStatus.COMPLETED: "status-completed",
+                WorkOrderStatus.RESOLVED: "status-resolved",
                 WorkOrderStatus.CANCELLED: "status-cancelled",
             }[wo.status]
 

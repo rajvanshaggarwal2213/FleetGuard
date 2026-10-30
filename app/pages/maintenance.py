@@ -231,7 +231,7 @@ def _render_work_order_card(wo: WorkOrder, session: Session):
                     st.rerun()
 
             # Cancel button for non-completed
-            if wo.status not in [WorkOrderStatus.COMPLETED, WorkOrderStatus.CANCELLED]:
+            if wo.status not in [WorkOrderStatus.RESOLVED, WorkOrderStatus.CANCELLED]:
                 if st.button("❌ Cancel", key=f"btn_cancel_{wo.id}", use_container_width=True):
                     wo.status = WorkOrderStatus.CANCELLED
                     wo.cancelled_timestamp = utcnow()
@@ -266,7 +266,7 @@ def _render_technicians_tab():
             ).count()
             completed = session.query(WorkOrder).filter(
                 WorkOrder.technician_id == tech.id,
-                WorkOrder.status == WorkOrderStatus.COMPLETED
+                WorkOrder.status == WorkOrderStatus.RESOLVED
             ).count()
 
             with st.expander(f"{tech.employee_id} - {tech.name} ({tech.specialization})", expanded=True):

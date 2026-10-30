@@ -74,7 +74,7 @@ def _get_fleet_stats(session: Session) -> Dict[str, Any]:
     ).count()
 
     completed_wos = session.query(WorkOrder).filter(
-        WorkOrder.status == WorkOrderStatus.COMPLETED
+        WorkOrder.status == WorkOrderStatus.RESOLVED
     ).count()
 
     avg_health = sum(v.health_score for v in vehicles) / total if total > 0 else 0
