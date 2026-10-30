@@ -11,7 +11,7 @@ from sqlalchemy import func
 
 from app.models.database import (
     WorkOrder, WorkOrderStatus, WorkOrderPriority, Vehicle,
-    MaintenanceAlert, MaintenanceHistory, Technician, AlertSeverity
+    MaintenanceAlert, MaintenanceHistory, Technician, AlertSeverity, utcnow
 )
 from app.models.connection import get_db_session
 
@@ -44,7 +44,7 @@ def _render_work_orders_tab():
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             status_filter = st.selectbox("Status",
-                ["All", "Open", "Assigned", "In Progress", "Completed", "Cancelled"], index=0)
+                ["All", "Open", "Assigned", "In Progress", "Resolved", "Closed", "Cancelled"], index=0)
         with col2:
             priority_filter = st.selectbox("Priority",
                 ["All", "Urgent", "High", "Medium", "Low"], index=0)
@@ -88,16 +88,18 @@ def _render_wo_summary(session: Session, work_orders: list):
     open_count = sum(1 for wo in work_orders if wo.status == WorkOrderStatus.OPEN)
     assigned = sum(1 for wo in work_orders if wo.status == WorkOrderStatus.ASSIGNED)
     in_progress = sum(1 for wo in work_orders if wo.status == WorkOrderStatus.IN_PROGRESS)
-    completed = sum(1 for wo in work_orders if wo.status == WorkOrderStatus.COMPLETED)
+    resolved = sum(1 for wo in work_orders if wo.status == WorkOrderStatus.RESOLVED)
+    closed = sum(1 for wo in work_orders if wo.status == WorkOrderStatus.CLOSED)
     urgent = sum(1 for wo in work_orders if wo.priority == WorkOrderPriority.URGENT)
 
-    cols = st.columns(6)
+    cols = st.columns(7)
     cols[0].metric("Total", total)
     cols[1].metric("📋 Open", open_count)
     cols[2].metric("👤 Assigned", assigned)
     cols[3].metric("⚙️ In Progress", in_progress)
-    cols[4].metric("✅ Completed", completed)
-    cols[5].metric("🚨 Urgent", urgent, delta_color="inverse")
+    cols[4].metric("✅ Resolved", resolved)
+    cols[5].metric("🔒 Closed", closed)
+    cols[6].metric("🚨 Urgent", urgent, delta_color="inverse")
 
 
 def _render_work_order_card(wo: WorkOrder, session: Session):
@@ -110,7 +112,8 @@ def _render_work_order_card(wo: WorkOrder, session: Session):
         WorkOrderStatus.OPEN: "status-open",
         WorkOrderStatus.ASSIGNED: "status-assigned",
         WorkOrderStatus.IN_PROGRESS: "status-in-progress",
-        WorkOrderStatus.COMPLETED: "status-completed",
+        WorkOrderStatus.RESOLVED: "status-resolved",
+        WorkOrderStatus.CLOSED: "status-closed",
         WorkOrderStatus.CANCELLED: "status-cancelled",
     }[wo.status]
 
@@ -157,7 +160,7 @@ def _render_work_order_card(wo: WorkOrder, session: Session):
                         if tech:
                             wo.technician_id = tech.id
                             wo.status = WorkOrderStatus.ASSIGNED
-                            wo.assigned_timestamp = datetime.utcnow()
+                            wo.assigned_timestamp = utcnow()
                             session.commit()
                             st.success(f"Assigned to {tech.name}!")
                             st.rerun()
@@ -167,25 +170,24 @@ def _render_work_order_card(wo: WorkOrder, session: Session):
             elif wo.status == WorkOrderStatus.ASSIGNED:
                 if st.button("▶️ Start Work", key=f"btn_start_{wo.id}", use_container_width=True, type="primary"):
                     wo.status = WorkOrderStatus.IN_PROGRESS
-                    wo.started_timestamp = datetime.utcnow()
+                    wo.started_timestamp = utcnow()
                     session.commit()
                     st.success("Work started!")
                     st.rerun()
 
             elif wo.status == WorkOrderStatus.IN_PROGRESS:
-                completion_notes = st.text_area("Completion Notes", key=f"notes_{wo.id}",
-                    placeholder="Describe work performed, parts replaced, etc.")
-                if st.button("✅ Complete", key=f"btn_complete_{wo.id}", use_container_width=True, type="primary"):
-                    wo.status = WorkOrderStatus.COMPLETED
-                    wo.completed_timestamp = datetime.utcnow()
+                completion_notes = st.text_area("Resolution Notes", key=f"notes_{wo.id}",
+                    placeholder="Describe work performed, parts replaced, resolution summary.")
+                if st.button("✅ Resolve", key=f"btn_resolve_{wo.id}", use_container_width=True, type="primary"):
+                    wo.status = WorkOrderStatus.RESOLVED
+                    wo.resolution_timestamp = utcnow()
                     wo.completion_notes = completion_notes
-                    wo.resolution_timestamp = datetime.utcnow()
 
                     # Create maintenance history record
                     history = MaintenanceHistory(
                         vehicle_id=wo.vehicle_id,
                         work_order_id=wo.id,
-                        service_date=datetime.utcnow(),
+                        service_date=utcnow(),
                         service_type="corrective" if wo.priority in [WorkOrderPriority.URGENT, WorkOrderPriority.HIGH] else "preventive",
                         component=wo.component,
                         description=wo.issue_description,
@@ -199,19 +201,31 @@ def _render_work_order_card(wo: WorkOrder, session: Session):
                     # Update alert if linked
                     if alert:
                         alert.is_resolved = True
-                        alert.resolved_at = datetime.utcnow()
+                        alert.resolved_at = utcnow()
                         alert.resolution_notes = completion_notes
 
                     session.commit()
-                    st.success("Work order completed!")
+                    st.success("Work order resolved!")
                     st.rerun()
 
-            elif wo.status == WorkOrderStatus.COMPLETED:
-                st.success("✅ Completed")
+            elif wo.status == WorkOrderStatus.RESOLVED:
+                st.success("✅ Resolved — awaiting closure")
+                if st.button("🔒 Close Work Order", key=f"btn_close_{wo.id}", use_container_width=True, type="primary"):
+                    wo.status = WorkOrderStatus.CLOSED
+                    session.commit()
+                    st.success("Work order closed!")
+                    st.rerun()
                 if st.button("🔄 Reopen", key=f"btn_reopen_{wo.id}", use_container_width=True):
                     wo.status = WorkOrderStatus.OPEN
-                    wo.completed_timestamp = None
                     wo.resolution_timestamp = None
+                    session.commit()
+                    st.success("Work order reopened!")
+                    st.rerun()
+
+            elif wo.status == WorkOrderStatus.CLOSED:
+                st.success("🔒 Closed")
+                if st.button("🔄 Reopen", key=f"btn_reopen_{wo.id}", use_container_width=True):
+                    wo.status = WorkOrderStatus.OPEN
                     session.commit()
                     st.success("Work order reopened!")
                     st.rerun()
@@ -220,7 +234,7 @@ def _render_work_order_card(wo: WorkOrder, session: Session):
             if wo.status not in [WorkOrderStatus.COMPLETED, WorkOrderStatus.CANCELLED]:
                 if st.button("❌ Cancel", key=f"btn_cancel_{wo.id}", use_container_width=True):
                     wo.status = WorkOrderStatus.CANCELLED
-                    wo.cancelled_timestamp = datetime.utcnow()
+                    wo.cancelled_timestamp = utcnow()
                     session.commit()
                     st.success("Work order cancelled!")
                     st.rerun()
@@ -280,7 +294,7 @@ def _render_calendar_tab():
             return
 
         # Calendar view
-        today = datetime.utcnow().date()
+        today = utcnow().date()
         next_30_days = today + timedelta(days=30)
 
         st.markdown("### Upcoming Scheduled Maintenance (Next 30 Days)")
@@ -351,11 +365,11 @@ def _render_maintenance_analytics_tab():
     st.markdown('<div class="chart-title">Maintenance Analytics</div>', unsafe_allow_html=True)
 
     with get_db_session() as session:
-        # Completed work orders in last 30 days
-        cutoff = datetime.utcnow() - timedelta(days=30)
-        completed = session.query(WorkOrder).filter(
-            WorkOrder.status == WorkOrderStatus.COMPLETED,
-            WorkOrder.completed_timestamp >= cutoff
+        # Resolved/closed work orders in last 30 days
+        cutoff = utcnow() - timedelta(days=30)
+        resolved_closed = session.query(WorkOrder).filter(
+            WorkOrder.status.in_([WorkOrderStatus.RESOLVED, WorkOrderStatus.CLOSED]),
+            WorkOrder.resolution_timestamp >= cutoff
         ).all()
 
         col1, col2 = st.columns(2)
@@ -367,9 +381,9 @@ def _render_maintenance_analytics_tab():
             </div>
             """, unsafe_allow_html=True)
 
-            if completed:
+            if resolved_closed:
                 type_counts = {}
-                for wo in completed:
+                for wo in resolved_closed:
                     # Determine type from priority
                     if wo.priority == WorkOrderPriority.URGENT:
                         t = "Emergency"
@@ -393,7 +407,7 @@ def _render_maintenance_analytics_tab():
                 )
                 st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
             else:
-                st.info("No completed work orders in the last 30 days.")
+                st.info("No resolved/closed work orders in the last 30 days.")
 
         with col2:
             st.markdown("""
@@ -402,11 +416,11 @@ def _render_maintenance_analytics_tab():
             </div>
             """, unsafe_allow_html=True)
 
-            if completed:
+            if resolved_closed:
                 priority_times = {}
-                for wo in completed:
-                    if wo.creation_timestamp and wo.completed_timestamp:
-                        hours = (wo.completed_timestamp - wo.creation_timestamp).total_seconds() / 3600
+                for wo in resolved_closed:
+                    if wo.creation_timestamp and wo.resolution_timestamp:
+                        hours = (wo.resolution_timestamp - wo.creation_timestamp).total_seconds() / 3600
                         priority_times.setdefault(wo.priority.value, []).append(hours)
 
                 avg_times = {k: sum(v)/len(v) for k, v in priority_times.items()}

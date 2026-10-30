@@ -17,10 +17,10 @@ from sqlalchemy import func
 
 from app.models.database import (
     Vehicle, MLModel, ModelExperiment, DatasetUpload,
-    SensorReading, Anomaly, AlertSeverity
+    SensorReading, Anomaly, AlertSeverity, utcnow
 )
 from app.models.connection import get_db_session
-from app.ml.rul_prediction import RULPredictor, CMapSSDataProcessor
+from app.ml.rul_prediction import RULPredictor, CMapSSDataProcessor, mlflow, MLFLOW_AVAILABLE
 
 
 def render():
@@ -144,7 +144,7 @@ def _train_nasa_model(train_file, test_file, rul_file):
                     dataset_type="nasa_fd001",
                     file_size_bytes=len(train_file.getvalue()),
                     is_valid=True,
-                    processed_at=datetime.utcnow(),
+                    processed_at=utcnow(),
                     uploaded_by="user",
                 )
                 session.add(upload)
@@ -182,8 +182,12 @@ def _show_nasa_predictions(model_record: MLModel, test_file, rul_file):
         test_df = processor.engineer_features(test_df)
         X_test, y_test = processor.prepare_features(test_df, fit_scaler=False)
 
-        # Load model from MLflow
-        import mlflow
+        # Load model from MLflow (graceful degradation if unavailable)
+        if not MLFLOW_AVAILABLE or mlflow is None:
+            st.info("MLflow is not available in this environment. "
+                    "Train a model first to enable MLflow-backed prediction loading.")
+            return
+
         mlflow.set_tracking_uri("file:///app/mlruns")
         model_uri = f"runs:/{model_record.experiments[0].run_id}/model" if model_record.experiments else None
 
@@ -356,7 +360,7 @@ def _render_fleet_health_tab():
         # Health score timeline for all vehicles
         st.markdown('<div class="chart-title">Fleet Health Score Timeline (Last 7 Days)</div>', unsafe_allow_html=True)
 
-        cutoff = datetime.utcnow() - timedelta(days=7)
+        cutoff = utcnow() - timedelta(days=7)
         history = session.query(VehicleHealthHistory).filter(
             VehicleHealthHistory.timestamp >= cutoff
         ).order_by(VehicleHealthHistory.timestamp).all()

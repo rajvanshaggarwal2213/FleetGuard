@@ -3,15 +3,17 @@ Utility functions for FleetGuard AI.
 """
 import hashlib
 import json
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 from functools import wraps
+
+from app.models.database import utcnow
 
 
 def generate_work_order_id() -> str:
     """Generate a unique work order ID."""
-    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-    hash_suffix = hashlib.md5(str(datetime.utcnow().timestamp()).encode()).hexdigest()[:4].upper()
+    now = utcnow()
+    timestamp = now.strftime("%Y%m%d%H%M%S")
+    hash_suffix = hashlib.md5(str(now.timestamp()).encode()).hexdigest()[:4].upper()
     return f"WO-{timestamp}-{hash_suffix}"
 
 

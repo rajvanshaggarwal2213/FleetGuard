@@ -14,7 +14,7 @@ from sqlalchemy import func
 from app.models.database import (
     Vehicle, VehicleType, HealthStatus, SensorReading,
     MaintenanceAlert, WorkOrder, WorkOrderStatus, AlertSeverity,
-    VehicleHealthHistory, SimulationEvent
+    VehicleHealthHistory, SimulationEvent, utcnow
 )
 from app.models.connection import get_db_session
 from app.simulation.engine import get_simulation_engine, SimulationEventType
@@ -80,7 +80,7 @@ def _get_fleet_stats(session: Session) -> Dict[str, Any]:
     avg_health = sum(v.health_score for v in vehicles) / total if total > 0 else 0
 
     # Recent alerts (last 24h)
-    cutoff = datetime.utcnow() - timedelta(hours=24)
+    cutoff = utcnow() - timedelta(hours=24)
     recent_alerts = session.query(MaintenanceAlert).filter(
         MaintenanceAlert.timestamp >= cutoff
     ).order_by(MaintenanceAlert.timestamp.desc()).limit(5).all()
@@ -191,7 +191,7 @@ def _render_fleet_health_trend(session: Session):
     </div>
     """, unsafe_allow_html=True)
 
-    cutoff = datetime.utcnow() - timedelta(days=7)
+    cutoff = utcnow() - timedelta(days=7)
     history = session.query(VehicleHealthHistory).filter(
         VehicleHealthHistory.timestamp >= cutoff
     ).order_by(VehicleHealthHistory.timestamp).all()
@@ -247,7 +247,7 @@ def _render_maintenance_events(session: Session):
     </div>
     """, unsafe_allow_html=True)
 
-    cutoff = datetime.utcnow() - timedelta(days=30)
+    cutoff = utcnow() - timedelta(days=30)
     events = session.query(SimulationEvent).filter(
         SimulationEvent.timestamp >= cutoff
     ).order_by(SimulationEvent.timestamp).all()
@@ -312,7 +312,7 @@ def _render_sensor_anomaly_trend(session: Session):
     </div>
     """, unsafe_allow_html=True)
 
-    cutoff = datetime.utcnow() - timedelta(hours=24)
+    cutoff = utcnow() - timedelta(hours=24)
     from app.models.database import Anomaly
     anomalies = session.query(Anomaly).filter(
         Anomaly.timestamp >= cutoff
@@ -420,7 +420,7 @@ def _render_recent_alerts(session: Session):
     </div>
     """, unsafe_allow_html=True)
 
-    cutoff = datetime.utcnow() - timedelta(hours=24)
+    cutoff = utcnow() - timedelta(hours=24)
     alerts = session.query(MaintenanceAlert).filter(
         MaintenanceAlert.timestamp >= cutoff
     ).order_by(MaintenanceAlert.timestamp.desc()).limit(10).all()

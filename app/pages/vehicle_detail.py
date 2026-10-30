@@ -13,7 +13,7 @@ from sqlalchemy import func
 from app.models.database import (
     Vehicle, VehicleType, HealthStatus, SensorReading,
     VehicleHealthHistory, Anomaly, MaintenanceAlert, WorkOrder,
-    MaintenanceHistory, AlertSeverity, WorkOrderStatus
+    MaintenanceHistory, AlertSeverity, WorkOrderStatus, utcnow
 )
 from app.models.connection import get_db_session
 
@@ -103,7 +103,7 @@ def _render_vehicle_header(vehicle: Vehicle):
     with col4:
         next_service = "—"
         if vehicle.next_scheduled_service:
-            days = (vehicle.next_scheduled_service - datetime.utcnow()).days
+            days = (vehicle.next_scheduled_service - utcnow()).days
             if days > 0:
                 next_service = f"{days} days"
             elif days == 0:
@@ -211,7 +211,7 @@ def _render_sensor_trends_tab(vehicle: Vehicle, session: Session):
     """Render sensor trends with interactive charts."""
     st.markdown('<div class="chart-title">Sensor Trends (Last 24 Hours)</div>', unsafe_allow_html=True)
 
-    cutoff = datetime.utcnow() - timedelta(hours=24)
+    cutoff = utcnow() - timedelta(hours=24)
     readings = session.query(SensorReading).filter(
         SensorReading.vehicle_id == vehicle.id,
         SensorReading.timestamp >= cutoff
@@ -291,7 +291,7 @@ def _render_anomalies_tab(vehicle: Vehicle, session: Session):
     """Render anomalies for the vehicle."""
     st.markdown('<div class="chart-title">Detected Anomalies</div>', unsafe_allow_html=True)
 
-    cutoff = datetime.utcnow() - timedelta(hours=48)
+    cutoff = utcnow() - timedelta(hours=48)
     anomalies = session.query(Anomaly).filter(
         Anomaly.vehicle_id == vehicle.id,
         Anomaly.timestamp >= cutoff

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.models.database import (
-    DatasetUpload, MLModel, ModelExperiment, Vehicle, SensorReading
+    DatasetUpload, MLModel, ModelExperiment, Vehicle, SensorReading, utcnow
 )
 from app.models.connection import get_db_session
 from app.ml.rul_prediction import CMapSSDataProcessor
@@ -187,7 +187,7 @@ def _train_model_from_upload(train_file, test_file, rul_file, dataset_type: str)
                     row_count=metrics.training_samples + metrics.validation_samples,
                     column_count=26,
                     is_valid=True,
-                    processed_at=datetime.utcnow(),
+                    processed_at=utcnow(),
                     uploaded_by="user",
                 )
                 session.add(upload)
@@ -376,7 +376,7 @@ def _render_simulation_settings_tab():
                 for v in vehicles:
                     v.health_score = 100.0
                     v.current_health_status = HealthStatus.HEALTHY
-                    v.updated_at = datetime.utcnow()
+                    v.updated_at = utcnow()
                 session.commit()
                 st.success("All vehicles reset to healthy!")
                 st.rerun()
@@ -403,7 +403,7 @@ def _render_simulation_settings_tab():
                     st.download_button(
                         "Download CSV",
                         csv,
-                        f"sensor_data_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv",
+                        f"sensor_data_{utcnow().strftime('%Y%m%d_%H%M%S')}.csv",
                         "text/csv",
                         use_container_width=True
                     )

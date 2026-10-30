@@ -143,7 +143,8 @@ st.markdown("""
     .status-open { background: rgba(0,168,232,0.15); color: var(--accent); }
     .status-assigned { background: rgba(111,66,193,0.15); color: #6f42c1; }
     .status-in-progress { background: rgba(255,193,7,0.15); color: #b8860b; }
-    .status-completed { background: rgba(40,167,69,0.15); color: var(--success); }
+    .status-resolved { background: rgba(40,167,69,0.15); color: #28a745; }
+    .status-closed { background: rgba(108,117,125,0.15); color: #6c757d; }
     .status-cancelled { background: rgba(108,117,125,0.15); color: #6c757d; }
 
     /* Sidebar */
@@ -619,7 +620,7 @@ def render_sidebar():
 
         wo_filter = st.selectbox(
             "Work Order Status",
-            ["All", "Open", "Assigned", "In Progress", "Completed", "Cancelled"],
+            ["All", "Open", "Assigned", "In Progress", "Resolved", "Closed", "Cancelled"],
             index=0,
             key="wo_filter_select"
         )

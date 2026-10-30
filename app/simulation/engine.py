@@ -17,7 +17,7 @@ from collections import deque
 from sqlalchemy.orm import Session
 
 from app.models.database import (
-    Vehicle, VehicleType, SensorReading, SimulationEvent, HealthStatus
+    Vehicle, VehicleType, SensorReading, SimulationEvent, HealthStatus, utcnow
 )
 from app.models.connection import get_db_session
 
@@ -378,7 +378,7 @@ class SimulationEngine:
             # Persist to database
             sensor_reading = SensorReading(
                 vehicle_id=vehicle_id,
-                timestamp=datetime.utcnow(),
+                timestamp=utcnow(),
                 engine_temperature_c=reading["engine_temp"],
                 engine_rpm=reading["rpm"],
                 oil_pressure_kpa=reading["oil_pressure"],
@@ -398,7 +398,7 @@ class SimulationEngine:
             if vehicle:
                 vehicle.engine_hours = state.operating_hours
                 vehicle.total_distance_km = state.distance_km
-                vehicle.updated_at = datetime.utcnow()
+                vehicle.updated_at = utcnow()
 
             session.commit()
 

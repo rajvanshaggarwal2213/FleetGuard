@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.models.database import (
     Vehicle, SensorReading, VehicleHealthHistory, HealthStatus,
     MaintenanceAlert, WorkOrder, WorkOrderStatus, WorkOrderPriority,
-    AlertSeverity, Anomaly, SimulationEvent, Technician
+    AlertSeverity, Anomaly, SimulationEvent, Technician, utcnow
 )
 from app.models.connection import get_db_session
 from app.ml.anomaly_detection import AnomalyDetector, AnomalyResult, AnomalyType, DEFAULT_THRESHOLDS
@@ -118,7 +118,7 @@ class HealthScorer:
         if not vehicle.last_service_date:
             return 50.0, "unknown"
 
-        days_since_service = (datetime.utcnow() - vehicle.last_service_date).days
+        days_since_service = (utcnow() - vehicle.last_service_date).days
 
         # Assume 90-day service interval
         if days_since_service <= 60:
@@ -144,7 +144,7 @@ class HealthScorer:
                 health_status=HealthStatus.CRITICAL,
                 factors=[],
                 anomalies=[],
-                timestamp=datetime.utcnow(),
+                timestamp=utcnow(),
                 recommendations=["No sensor data available"]
             )
 
@@ -185,9 +185,9 @@ class HealthScorer:
             score=maint_score,
             weight=self.weights.get("maintenance_interval", 0.1),
             status=maint_status,
-            value=(datetime.utcnow() - vehicle.last_service_date).days if vehicle.last_service_date else 0,
+            value=(utcnow() - vehicle.last_service_date).days if vehicle.last_service_date else 0,
             expected_range=(0, 90),
-            description=f"Days since last service: {(datetime.utcnow() - vehicle.last_service_date).days if vehicle.last_service_date else 'Unknown'}"
+            description=f"Days since last service: {(utcnow() - vehicle.last_service_date).days if vehicle.last_service_date else 'Unknown'}"
         )
         factors.append(maint_factor)
 
@@ -219,7 +219,7 @@ class HealthScorer:
             health_status=health_status,
             factors=factors,
             anomalies=anomalies,
-            timestamp=datetime.utcnow(),
+            timestamp=utcnow(),
             recommendations=recommendations
         )
 
@@ -400,7 +400,7 @@ class MaintenanceTriageEngine:
         # Update vehicle health in database
         vehicle.health_score = assessment.overall_score
         vehicle.current_health_status = assessment.health_status
-        vehicle.updated_at = datetime.utcnow()
+        vehicle.updated_at = utcnow()
 
         # Save health history
         health_history = VehicleHealthHistory(
@@ -480,7 +480,7 @@ class MaintenanceTriageEngine:
                     # Create composite alert
                     alert = MaintenanceAlert(
                         vehicle_id=vehicle.id,
-                        timestamp=datetime.utcnow(),
+                        timestamp=utcnow(),
                         alert_type="multiple_anomalies",
                         component=multi_rule["component"],
                         severity=multi_rule["severity"],
@@ -497,7 +497,7 @@ class MaintenanceTriageEngine:
 
     def _is_duplicate_alert(self, vehicle_id: int, rule_id: str) -> bool:
         """Check if similar alert was recently created."""
-        cutoff = datetime.utcnow() - timedelta(hours=self.dedup_window_hours)
+        cutoff = utcnow() - timedelta(hours=self.dedup_window_hours)
         existing = self.session.query(MaintenanceAlert).filter(
             MaintenanceAlert.vehicle_id == vehicle_id,
             MaintenanceAlert.timestamp >= cutoff,
@@ -516,7 +516,7 @@ class MaintenanceTriageEngine:
         alert = MaintenanceAlert(
             vehicle_id=vehicle.id,
             anomaly_id=None,  # Will be set after flush
-            timestamp=datetime.utcnow(),
+            timestamp=utcnow(),
             alert_type=rule["id"],
             component=rule["component"],
             severity=rule["severity"],
@@ -535,10 +535,16 @@ class MaintenanceTriageEngine:
 
 
 def auto_generate_work_orders(session: Session) -> List[WorkOrder]:
-    """Automatically generate work orders from unresolved critical/high alerts."""
+    """Automatically generate work orders from unresolved critical/high alerts.
+
+    Idempotent: the query filter ``MaintenanceAlert.work_order == None`` excludes
+    alerts that already have a linked work order, and the unique constraint on
+    ``alert_id`` (one work order per alert) is enforced at the database level.
+    Duplicate work orders are never created for the same alert.
+    """
     new_work_orders = []
 
-    # Find alerts needing work orders
+    # Find alerts needing work orders (no existing work order, unresolved, critical/high)
     alerts = session.query(MaintenanceAlert).filter(
         MaintenanceAlert.is_resolved == False,
         MaintenanceAlert.severity.in_([AlertSeverity.CRITICAL, AlertSeverity.HIGH]),
@@ -561,7 +567,7 @@ def auto_generate_work_orders(session: Session) -> List[WorkOrder]:
         ).first()
 
         work_order = WorkOrder(
-            work_order_id=f"WO-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{alert.vehicle_id}",
+            work_order_id=f"WO-{utcnow().strftime('%Y%m%d%H%M%S')}-{alert.vehicle_id}",
             vehicle_id=alert.vehicle_id,
             alert_id=alert.id,
             technician_id=technician.id if technician else None,

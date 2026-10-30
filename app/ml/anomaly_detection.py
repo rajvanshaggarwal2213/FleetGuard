@@ -22,7 +22,7 @@ from sklearn.pipeline import Pipeline
 from sqlalchemy.orm import Session
 
 from app.models.database import (
-    SensorReading, Anomaly, Vehicle, AlertSeverity
+    SensorReading, Anomaly, Vehicle, AlertSeverity, utcnow
 )
 from app.models.connection import get_db_session
 
@@ -437,7 +437,7 @@ def get_recent_anomalies(
 ) -> List[Anomaly]:
     """Get recent anomalies from database."""
     query = session.query(Anomaly).filter(
-        Anomaly.timestamp >= datetime.utcnow() - timedelta(hours=hours)
+        Anomaly.timestamp >= utcnow() - timedelta(hours=hours)
     )
 
     if vehicle_id:

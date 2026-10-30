@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.models.database import (
     Base, Vehicle, VehicleType, HealthStatus, SensorReading,
     VehicleHealthHistory, Technician, WorkOrderStatus, WorkOrderPriority,
-    AlertSeverity
+    AlertSeverity, utcnow
 )
 from app.models.connection import DatabaseManager
 

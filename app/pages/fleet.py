@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.models.database import (
-    Vehicle, VehicleType, HealthStatus, SensorReading
+    Vehicle, VehicleType, HealthStatus, SensorReading, utcnow
 )
 from app.models.connection import get_db_session
 
@@ -81,7 +81,7 @@ def _render_fleet_table(vehicles: list, session: Session):
         # Next maintenance estimate
         next_maint = "—"
         if v.next_scheduled_service:
-            days = (v.next_scheduled_service - datetime.utcnow()).days
+            days = (v.next_scheduled_service - utcnow()).days
             if days > 0:
                 next_maint = f"{days} days"
             elif days == 0:

@@ -1,9 +1,22 @@
 """
 Database models for FleetGuard AI.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum as PyEnum
 from typing import Optional
+
+
+def utcnow():
+    """Return the current UTC time as a naive datetime.
+
+    Replaces deprecated datetime.utcnow() (removed in Python 3.12+,
+    emits DeprecationWarning in 3.15). Uses datetime.now(timezone.utc)
+    internally to avoid the deprecation, then strips tzinfo so the
+    return value remains compatible with existing naive-datetime code
+    (SQLAlchemy columns without timezone=True, test fixtures, etc.).
+    All callers should treat the result as UTC.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 from sqlalchemy import (
     Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey, Enum, Index, UniqueConstraint
@@ -37,7 +50,8 @@ class WorkOrderStatus(PyEnum):
     OPEN = "open"
     ASSIGNED = "assigned"
     IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
+    RESOLVED = "resolved"
+    CLOSED = "closed"
     CANCELLED = "cancelled"
 
 
@@ -64,8 +78,8 @@ class Vehicle(Base):
     current_health_status = Column(Enum(HealthStatus), default=HealthStatus.HEALTHY)
     health_score = Column(Float, default=100.0)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     # Relationships
     sensor_readings = relationship("SensorReading", back_populates="vehicle", cascade="all, delete-orphan")
@@ -85,7 +99,7 @@ class SensorReading(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    timestamp = Column(DateTime, default=utcnow, nullable=False, index=True)
 
     # Engine sensors
     engine_temperature_c = Column(Float, nullable=False)
@@ -120,7 +134,7 @@ class VehicleHealthHistory(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    timestamp = Column(DateTime, default=utcnow, nullable=False, index=True)
     health_score = Column(Float, nullable=False)
     health_status = Column(Enum(HealthStatus), nullable=False)
     contributing_factors = Column(Text, nullable=True)  # JSON string
@@ -142,7 +156,7 @@ class Anomaly(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False, index=True)
     sensor_reading_id = Column(Integer, ForeignKey("sensor_readings.id", ondelete="SET NULL"), nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    timestamp = Column(DateTime, default=utcnow, nullable=False, index=True)
 
     anomaly_type = Column(String(100), nullable=False)  # e.g., "threshold_breach", "trend_anomaly", "isolation_forest"
     sensor_name = Column(String(50), nullable=False)
@@ -172,7 +186,7 @@ class MaintenanceAlert(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False, index=True)
     anomaly_id = Column(Integer, ForeignKey("anomalies.id", ondelete="SET NULL"), nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    timestamp = Column(DateTime, default=utcnow, nullable=False, index=True)
 
     alert_type = Column(String(100), nullable=False)
     component = Column(String(100), nullable=False)
@@ -218,7 +232,7 @@ class WorkOrder(Base):
     recommended_inspection = Column(Text, nullable=False)
 
     status = Column(Enum(WorkOrderStatus), default=WorkOrderStatus.OPEN, nullable=False)
-    creation_timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    creation_timestamp = Column(DateTime, default=utcnow, nullable=False)
     assigned_timestamp = Column(DateTime, nullable=True)
     started_timestamp = Column(DateTime, nullable=True)
     completed_timestamp = Column(DateTime, nullable=True)
@@ -243,7 +257,7 @@ class MaintenanceHistory(Base):
     vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False, index=True)
     work_order_id = Column(Integer, ForeignKey("work_orders.id", ondelete="SET NULL"), nullable=True)
 
-    service_date = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    service_date = Column(DateTime, default=utcnow, nullable=False, index=True)
     service_type = Column(String(100), nullable=False)  # preventive, corrective, inspection
     component = Column(String(100), nullable=False)
     description = Column(Text, nullable=False)
@@ -289,7 +303,7 @@ class MLModel(Base):
     # Metadata
     training_config = Column(Text, nullable=True)  # JSON string
     is_active = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
     trained_by = Column(String(100), nullable=True)
 
     # Relationships
@@ -323,7 +337,7 @@ class ModelExperiment(Base):
 
     # Status
     status = Column(String(50), default="running")  # running, completed, failed
-    started_at = Column(DateTime, default=datetime.utcnow)
+    started_at = Column(DateTime, default=utcnow)
     completed_at = Column(DateTime, nullable=True)
     error_message = Column(Text, nullable=True)
 
@@ -354,7 +368,7 @@ class DatasetUpload(Base):
     processing_duration_seconds = Column(Float, nullable=True)
 
     uploaded_by = Column(String(100), nullable=True)
-    uploaded_at = Column(DateTime, default=datetime.utcnow)
+    uploaded_at = Column(DateTime, default=utcnow)
 
     def __repr__(self):
         return f"<DatasetUpload {self.filename} valid={self.is_valid}>"
@@ -365,7 +379,7 @@ class SimulationEvent(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    timestamp = Column(DateTime, default=utcnow, nullable=False, index=True)
 
     event_type = Column(String(100), nullable=False)  # normal, overheating, vibration, low_oil_pressure, battery_deterioration, degradation
     description = Column(Text, nullable=False)
@@ -393,7 +407,7 @@ class Technician(Base):
     phone = Column(String(50), nullable=True)
     specialization = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
 
     # Relationships
     work_orders = relationship("WorkOrder", back_populates="technician")

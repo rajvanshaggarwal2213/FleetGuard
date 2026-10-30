@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.models.database import (
-    MaintenanceAlert, Vehicle, Anomaly, AlertSeverity
+    MaintenanceAlert, Vehicle, Anomaly, AlertSeverity, utcnow
 )
 from app.models.connection import get_db_session
 
@@ -49,11 +49,11 @@ def render():
 
         # Apply time filter
         if time_filter == "Last 24h":
-            query = query.filter(MaintenanceAlert.timestamp >= datetime.utcnow() - timedelta(hours=24))
+            query = query.filter(MaintenanceAlert.timestamp >= utcnow() - timedelta(hours=24))
         elif time_filter == "Last 7d":
-            query = query.filter(MaintenanceAlert.timestamp >= datetime.utcnow() - timedelta(days=7))
+            query = query.filter(MaintenanceAlert.timestamp >= utcnow() - timedelta(days=7))
         elif time_filter == "Last 30d":
-            query = query.filter(MaintenanceAlert.timestamp >= datetime.utcnow() - timedelta(days=30))
+            query = query.filter(MaintenanceAlert.timestamp >= utcnow() - timedelta(days=30))
 
         alerts = query.order_by(MaintenanceAlert.timestamp.desc()).limit(200).all()
 
@@ -146,7 +146,7 @@ def _render_alert_list(alerts: list, session: Session):
                 if not alert.is_acknowledged:
                     if st.button("✅ Acknowledge", key=f"ack_{alert.id}", use_container_width=True):
                         alert.is_acknowledged = True
-                        alert.acknowledged_at = datetime.utcnow()
+                        alert.acknowledged_at = utcnow()
                         session.commit()
                         st.success("Alert acknowledged!")
                         st.rerun()
@@ -158,7 +158,7 @@ def _render_alert_list(alerts: list, session: Session):
                 if not alert.is_resolved:
                     if st.button("✅ Resolve", key=f"resolve_{alert.id}", use_container_width=True, type="primary"):
                         alert.is_resolved = True
-                        alert.resolved_at = datetime.utcnow()
+                        alert.resolved_at = utcnow()
                         session.commit()
                         st.success("Alert resolved!")
                         st.rerun()
