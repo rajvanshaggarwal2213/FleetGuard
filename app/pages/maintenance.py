@@ -313,7 +313,7 @@ def _render_calendar_tab():
                 return ""
 
             st.dataframe(
-                df.style.applymap(style_days, subset=["Days"]),
+                df.style.map(style_days, subset=["Days"]),
                 use_container_width=True,
                 hide_index=True,
             )

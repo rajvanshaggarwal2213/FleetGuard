@@ -128,7 +128,7 @@ def _render_fleet_table(vehicles: list, session: Session):
         except:
             return ""
 
-    styled = df.style.applymap(style_status, subset=["Status"]).applymap(style_health, subset=["Health Score"])
+    styled = df.style.map(style_status, subset=["Status"]).map(style_health, subset=["Health Score"])
 
     # Display with clickable rows
     event = st.dataframe(

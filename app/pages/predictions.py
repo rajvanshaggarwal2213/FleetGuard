@@ -348,7 +348,7 @@ def _render_fleet_health_tab():
             return ""
 
         st.dataframe(
-            df.style.applymap(style_status, subset=["Status"]).applymap(style_maint, subset=["Est. Maintenance"]),
+            df.style.map(style_status, subset=["Status"]).map(style_maint, subset=["Est. Maintenance"]),
             use_container_width=True,
             hide_index=True,
         )

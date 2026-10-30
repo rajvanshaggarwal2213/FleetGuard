@@ -201,7 +201,7 @@ def _render_overview_tab(vehicle: Vehicle, session: Session):
             return ""
 
         st.dataframe(
-            df.style.applymap(style_status, subset=["Status"]),
+            df.style.map(style_status, subset=["Status"]),
             use_container_width=True,
             hide_index=True,
         )
@@ -325,7 +325,7 @@ def _render_anomalies_tab(vehicle: Vehicle, session: Session):
         return colors.get(val, "")
 
     st.dataframe(
-        df.style.applymap(style_severity, subset=["Severity"]),
+        df.style.map(style_severity, subset=["Severity"]),
         use_container_width=True,
         hide_index=True,
     )
